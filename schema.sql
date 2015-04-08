@@ -31,7 +31,7 @@ CREATE TABLE canonical_mfr(
 -- Load products
 copy json(doc) from :products_txt csv quote e'\x01' delimiter e'\x02';
 INSERT INTO products(name, mfr, model, family) SELECT doc->>'product_name', doc->>'manufacturer', doc->>'model', doc->>'family' FROM json;
-UPDATE products SET clean_product = lower(trim(rpad(regexp_replace(model, '\yPEN\y-?|D[MS]C-?|Tough | ', '', 'g'), 10)));
+UPDATE products SET clean_product = trim(rpad(regexp_replace(regexp_replace(lower(model), '\ypen\y-?|d[ms]c-?|tough |dslr-?', '', 'g'), '[ -]*', '', 'g'), 10));
 --    trim(rpad(coalesce(family || ' ', '') || model, 30));
 
 CREATE INDEX ON products(mfr);
@@ -51,10 +51,10 @@ UPDATE listings SET clean_listing =
       regexp_replace(
         regexp_replace(
           regexp_replace(
-            regexp_replace(lower(unaccent(title)), '[-_]', ' ', 'g'),
+            regexp_replace(lower(unaccent(title)), '[-_&]', ' ', 'g'),
             '\(.*|\+.*|[0-9][0-9.,]+ ?mp.*|[0-9][0-9,.]+ ?mio.*|[0-9][0-9,.]+ mega.*|[0-9][0-9,.]+ mpix.*|/.*|with.*|,.*|\yfor\y.*|\yfur\y.*|\ypour\y.*|\yfür\y.*',
             ''), -- e.g. Nikon D90, Nikon's newest camera!
-          '\yagfa\y|\ycanon\y|\ycasio\y|\yepson\y|\yfuji\y|\yfuji?film\y|\yhp\y|\ykodak\y|\ykonica\y|\yminolta\y|\ykyocera\y|' ||
+          '\ysigma\y|\yagfa\y|\ycanon\y|\ycasio\y|\yepson\y|\yfuji\y|\yfuji?film\y|\yhp\y|\ykodak\y|\ykonica\y|\yminolta\y|\ykyocera\y|' ||
           '\yleica\y|\ynikon\y|\yolympus\y|\ypanasonic\y|\ypentax\y|\ypolaroid\y|\yricoh\y|\ysamsung\y|\ysony\y|\ytoshiba\y|' ||
           '\yephoto\y|\yhs\y|\yelph\y|\yeos\y|\yrebel\y|\yixus\y|\yixy\y|\ykiss\y|\ypowershot\y|\ypower shot\y|' ||
           '\yis\y|\ydigital\y|\yexilim\y|\yphotopc\y|\yexr\y|\yfinepix\y|\yzoom\y|\yphotosmart\y|\yeasyshare\y|' ||
@@ -63,7 +63,8 @@ UPDATE listings SET clean_listing =
           '\ypen\y|\ytough\y|\yred\y|\yblack\y|\yblue\y|\ywhite\y|\ysilver\y|\ypink\y|\ycompact\y|\ystarry\y|\ystill\y|' ||
           '\ycmos\y|\yappareil\y|\yd?slr\y|\yd?slr|d?slr\y|\yphoto\y|\ykamera\y|\ynume?rique\y|\yreflex\y.*|\ysystemkamera\y|' ||
           '\ybody\y|\ypure white\y|\ychampagne\y|\yblanc\y|\yplatinum\y|\ynoir\y|\yrouge\y|\yschwarz\y|\yweis\y|\yweiss\y|' ||
-          '\ygreen\y|\ykit\y',
+          '\ygreen\y|\ykit\y|\y4/3\y|\ymicro\y|\yinterchangeable\y|\yviolet\y|\ygray\y|\ygrey\y|\ycharcoal\y|\yholzkohle\y|' ||
+          '\ynacht\y|\ydsc|\ydmc|\yonly\y|\ypoint\y|\yshoot\y',
           ' ',
           'g'),
           ' ',
@@ -94,15 +95,7 @@ SELECT
     JOIN canonical_mfr cm ON cm.product_mfr = p.mfr
     WHERE cm.listing_mfr = l.mfr AND clean_listing <-> clean_product < 0.5
     ORDER BY clean_listing <-> clean_product
-    LIMIT 1) AS product_id,
-  (SELECT 
-    clean_listing <-> clean_product
-    FROM products p
-    JOIN canonical_mfr cm ON cm.product_mfr = p.mfr
-    WHERE cm.listing_mfr = l.mfr
-    ORDER BY clean_listing <-> clean_product
-    LIMIT 1) AS score
-
+    LIMIT 1) AS product_id
   FROM listings l;
 
 WITH unaggregated_results AS (
